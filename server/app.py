@@ -1,5 +1,7 @@
 from fastapi import FastAPI
 
+from .routers import movie
+
 app = FastAPI()
 
 
@@ -13,4 +15,4 @@ def read_item(item_id: int):
     return {"item_id": item_id}
 
 
-# app.include_router(movie.router)
+app.include_router(movie.router)

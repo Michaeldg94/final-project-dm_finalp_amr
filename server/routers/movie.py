@@ -1,28 +1,56 @@
-'''
-from typing import Annotated
+from typing import Generator
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from server.schemas.movie import MovieListResponse
-from server.schemas.ratings import MovieAvgRatingResponse
-from server.services import movie as svc
+from server.backend.postgres import PostgresSessionManager
+from server.models import MovieModel
+from server.schemas.movie import MovieResponse
 
 router = APIRouter(prefix="/movies", tags=["Movies"])
 
-
-@router.get("", response_model=MovieListResponse)
-async def list_movies(
-    limit: Annotated[int, Query(ge=1, le=100)] = 10,
-    page: Annotated[int, Query(ge=1)] = 1,
-    search: Annotated[
-        str | None, Query(description="Full-text search in title and genres")
-    ] = None,
-) -> MovieListResponse:
-    items, total = svc.search_movies(db, limit=limit, page=page, search=search)
-    return {"movies": items, "total": total, "page": page, "limit": limit}
+session_manager = PostgresSessionManager()
 
 
+# 🔹 Dependencia para inyectar la sesión en las rutas
+def get_db() -> Generator[Session, None, None]:
+    with session_manager.open_session() as session:
+        yield session
+
+
+@router.get("/{movie_id}", response_model=MovieResponse)
+async def get_movie(movie_id: int, db: Session = Depends(get_db)):
+    movie = db.query(MovieModel).filter(MovieModel.movie_id == movie_id).first()
+    if not movie:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Movie not found"
+        )
+    return movie
+
+
+"""
+DOES NOT WORK
+@router.get("/{movie_id}", response_model=MovieModel)
+async def get_movie(movie_id: int, db: Session = Depends(get_db)):
+    movie = db.query(MovieModel).filter(MovieModel.movie_id == movie_id).first()
+    if not movie:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="hiiiiiiiiii")
+    return movie
+"""
+
+"""
+@router.get("/{movie_id}", response_model=MovieAvgRatingResponse)
+async def get_movie(movie_id: int, db: Session = Depends(get_db)):
+    movie = db.query(MovieModel).filter(MovieModel.id == movie_id).first()
+    if not movie:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Movie with id {movie_id} not found",
+        )
+    return movie
+"""
+
+'''
 @router.get("/{movie_id}/avg-rating", response_model=MovieAvgRatingResponse)
 async def movie_avg_rating(
     movie_id: int,

@@ -25,3 +25,11 @@ class MovieListResponse(BaseModel):
     total: int
     page: int
     limit: int
+
+
+class MovieResponse(BaseModel):
+    movie_id: int
+    title: str
+
+    class Config:
+        orm_mode = True
