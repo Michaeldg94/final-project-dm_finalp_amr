@@ -1,19 +1,16 @@
 from fastapi import FastAPI
 
-app = FastAPI(title="My FastAPI app")
-
-
-@app.get("/health")
-def health():
-    return {"status": "ok"}
+app = FastAPI()
 
 
 @app.get("/")
 def read_root():
-    return {"message": "Hello from FastAPI!"}
+    return {"message": "Hello FastAPI"}
 
 
-if __name__ == "__main__":
-    import uvicorn
+@app.get("/items/{item_id}")
+def read_item(item_id: int):
+    return {"item_id": item_id}
 
-    uvicorn.run("app:app", host="127.0.0.1", port=8000, reload=True)
+
+# app.include_router(movie.router)

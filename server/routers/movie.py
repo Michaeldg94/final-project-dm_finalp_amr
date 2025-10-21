@@ -1,3 +1,4 @@
+'''
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -70,3 +71,4 @@ async def movie_avg_rating(
     result = await session.execute(query)
     movies = result.scalars().unique().all()
 """
+'''

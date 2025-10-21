@@ -1,3 +1,4 @@
+'''
 from typing import List
 
 from sqlalchemy import select
@@ -34,3 +35,4 @@ class MovieDataManager(BaseDataManager):
             schemas += [MovieSchema(**model.to_dict())]
 
         return schemas
+'''
