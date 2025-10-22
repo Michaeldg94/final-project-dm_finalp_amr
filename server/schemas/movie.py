@@ -1,6 +1,6 @@
 from typing import List
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from server.schemas.genres import GenreSchema, GenrePublicSchema
 
@@ -38,3 +38,18 @@ class MovieResponse(BaseModel):
 
     class Config:
         orm_mode = True
+
+
+
+# =======================================
+#      AVERAGE RATING RESPONSE SCHEMA
+# =======================================
+class MovieAvgRatingResponse(BaseModel):
+    movie_id: int
+    title: str
+    avg_rating: float = Field(..., description="Average rating for this movie")
+    total_ratings: int = Field(
+        ..., description="Total number of ratings for this movie"
+    )
+    class Config:
+        from_attributes = True 

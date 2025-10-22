@@ -13,7 +13,7 @@ class BaseService:
     Encapsula la sesión de base de datos.
     """
 
-    def _init_(self, session: AsyncSession):
+    def __init__(self, session: AsyncSession):
         self.session: AsyncSession = session
 
 
@@ -23,7 +23,7 @@ class BaseDataManager(Generic[T]):
     sobre modelos SQLAlchemy, con tipado compatible con Pylance.
     """
 
-    def _init_(self, session: AsyncSession):
+    def __init__(self, session: AsyncSession):
         self.session: AsyncSession = session
 
     async def get_one(self, stmt: Select[Any]) -> Optional[T]:

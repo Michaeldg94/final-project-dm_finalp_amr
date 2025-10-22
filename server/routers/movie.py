@@ -7,9 +7,11 @@ from sqlalchemy import func, or_
 
 from server.backend.postgres import PostgresSessionManager
 from server.models import MovieModel, GenreModel
-from server.schemas.movie import MovieResponse, MovieListResponse
+from server.schemas.movie import MovieResponse, MovieListResponse, MovieAvgRatingResponse
+from server.services.movie import MovieService
 
-router = APIRouter(prefix="/movies", tags=["Movies"])
+
+router = APIRouter(prefix="/api/rest/v1/movies", tags=["Movies"])
 
 session_manager = PostgresSessionManager()
 
@@ -60,13 +62,34 @@ async def get_movie_list(page: int = Query(1, ge=1, description="Page number (st
             status_code=status.HTTP_404_NOT_FOUND,
             detail="No movies found for this page."
         )
-    return {
-        "movies": movies,
-        "page": page,
-        "limit":limit,
-        "total": total,
+    return MovieListResponse(
+        movies=movies,
+        page=page,
+        limit=limit,
+        total=total,
+    )
 
-    }
+@router.get("/{movie_id}/avg-rating", response_model=MovieAvgRatingResponse)
+async def get_movie_avg_rating(movie_id: int, db: Session = Depends(get_db)):
+    service = MovieService(db)
+    row = service.get_avg_rating(movie_id)
+
+    if not row:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Movie with id {movie_id} not found or has no ratings."
+        )
+
+    # row is a SQLAlchemy Row object
+    avg_rating = float(row.avg_rating) if row.avg_rating is not None else None
+    total_ratings = int(row.total_ratings) if row.total_ratings is not None else 0
+
+    return MovieAvgRatingResponse(
+    movie_id=row.movie_id,
+    title=row.title,
+    avg_rating=avg_rating,
+    total_ratings=total_ratings,
+    )
 
 """
 DOES NOT WORK        "total": total,
