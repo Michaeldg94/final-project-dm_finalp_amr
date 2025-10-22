@@ -1,6 +1,8 @@
 from typing import Any, Generic, Optional, Sequence, TypeVar
 
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
+
 from sqlalchemy.sql import Select
 
 # Define un tipo genérico para representar cualquier modelo SQLAlchemy
@@ -19,23 +21,18 @@ class BaseService:
 
 class BaseDataManager(Generic[T]):
     """
-    Clase base genérica para manejar operaciones CRUD
-    sobre modelos SQLAlchemy, con tipado compatible con Pylance.
+    Base class for managing CRUD operations using SQLAlchemy (sync version).
     """
 
-    def __init__(self, session: AsyncSession):
-        self.session: AsyncSession = session
+    def __init__(self, session: Session):
+        self.session: Session = session
 
-    async def get_one(self, stmt: Select[Any]) -> Optional[T]:
-        """
-        Ejecuta un statement y devuelve un único registro o None.
-        """
-        result = await self.session.execute(stmt)
+    def get_one(self, stmt: Select[Any]) -> Optional[T]:
+        """Execute a statement and return one record or None."""
+        result = self.session.execute(stmt)
         return result.scalar_one_or_none()
 
-    async def get_all(self, stmt: Select[Any]) -> Sequence[T]:
-        """
-        Ejecuta un statement y devuelve una lista de registros.
-        """
-        result = await self.session.execute(stmt)
+    def get_all(self, stmt: Select[Any]) -> Sequence[T]:
+        """Execute a statement and return all records."""
+        result = self.session.execute(stmt)
         return result.scalars().all()

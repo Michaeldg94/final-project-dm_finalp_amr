@@ -1,14 +1,17 @@
 
-from typing import List
+from typing import List, Optional, Tuple
 
-from sqlalchemy import select, func
+from sqlalchemy import select, func, or_
 
 from server.models.movies import MovieModel
 from server.models.ratings import RatingModel
+from server.models.genres import GenreModel
 from server.schemas.movie import MovieSchema
 from server.services.base import BaseDataManager, BaseService
 
-
+# ======================================
+#           SERVICE LAYER
+# ======================================
 class MovieService(BaseService):
     def get_movie(self, movie_id: int) -> MovieSchema:
         return MovieDataManager(self.session).get_movie(movie_id)
@@ -16,12 +19,26 @@ class MovieService(BaseService):
     def get_movies(self, year: int, rating: float) -> List[MovieSchema]:
         return MovieDataManager(self.session).get_movies(year, rating)
     
-    def get_movies_paginated(self, page: int, page_size: int = 10) -> List[MovieSchema]:
-        """Return a paginated list of movies."""
-        return MovieDataManager(self.session).get_movies_paginated(page, page_size)
+    def get_movies_paginated(
+        self, page: int, limit: int, search: Optional[str] = None
+    ) -> Tuple[List[MovieSchema], int]:
+        
+        """Return paginated MovieSchema list and total count."""
+        
+        models, total = MovieDataManager(self.session).get_movies_paginated(
+            page=page, limit=limit, search=search
+        )
+        # Convert ORM models to Pydantic schemas
+        schemas = [MovieSchema.model_validate(m) for m in models]
+        return schemas, total
     
     def get_avg_rating(self, movie_id: int):
         return MovieDataManager(self.session).avg_rating(movie_id)
+
+
+# ======================================
+#           DATA ACCESS LAYER
+# ======================================
 
 class MovieDataManager(BaseDataManager):
     def get_movie(self, movie_id: int) -> MovieSchema:
@@ -42,6 +59,51 @@ class MovieDataManager(BaseDataManager):
             schemas += [MovieSchema(**model.to_dict())]
 
         return schemas
+    
+    def get_movies_paginated(
+        self,
+        page: int = 1,
+        limit: int = 10,
+        search: Optional[str] = None,
+    ) -> Tuple[List[MovieModel], int]:
+        """Return a list of MovieModel instances and total count."""
+        offset = (page - 1) * limit
+
+        # Base query
+        stmt = select(MovieModel).distinct().join(MovieModel.genres, isouter=True)
+
+        # Apply search filter
+        if search:
+            search_term = f"%{search.lower()}%"
+            stmt = stmt.where(
+                or_(
+                    func.lower(MovieModel.title).like(search_term),
+                    func.lower(GenreModel.genre_name) == search_term,
+                )
+            )
+
+        # Count total
+        count_stmt = (
+            select(func.count(func.distinct(MovieModel.movie_id)))
+            .select_from(MovieModel)
+            .join(MovieModel.genres, isouter=True)
+        )
+
+        if search:
+            count_stmt = count_stmt.where(
+                or_(
+                    func.lower(MovieModel.title).like(search_term),
+                    func.lower(GenreModel.genre_name) == search_term,
+                )
+            )
+
+        total = self.session.execute(count_stmt).scalar() or 0
+
+        # Fetch paginated results
+        stmt = stmt.offset(offset).limit(limit)
+        models = self.get_all(stmt)
+
+        return models, total
    
     def avg_rating(self, movie_id: int):
         """Return movie title, avg_rating, and total_ratings for a movie."""
@@ -61,14 +123,3 @@ class MovieDataManager(BaseDataManager):
         return result  # will be a Row with (movie_id, title, avg_rating, total_ratings)
     
     
-    def get_movies_paginated(self, page: int, page_size: int = 10) -> List[MovieSchema]:
-        """Return a list of movies for a given page."""
-        offset = (page - 1) * page_size
-        stmt = (
-        select(MovieModel)
-        .order_by(MovieModel.movie_id)  # ✅ ensures consistent order
-        .offset(offset)
-        .limit(page_size)
-    )
-        models = self.get_all(stmt)
-        return [MovieSchema(**m.to_dict()) for m in models]

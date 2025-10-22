@@ -35,33 +35,16 @@ async def get_movie_list(page: int = Query(1, ge=1, description="Page number (st
                         limit: int = Query(10, ge=1, le=100, description="Number of movies per page"),
                         search: str | None = Query(None, description="Search in title or genre name"),
                         db: Session = Depends(get_db)):
-    offset = (page - 1) * limit
     
-    query = db.query(MovieModel)
-
-    
-    if search:
-        search_term = f"%{search.lower()}%"
-        query = (
-            query.join(MovieModel.genres)
-            .filter(
-                or_(
-                func.lower(MovieModel.title).like(search_term),
-                func.lower(GenreModel.genre_name)==search_term
-            ))
-            .distinct()
-        )
-
-    total = query.count()
-    movies = query.offset(offset).limit(limit).all()
-
-   
+    service= MovieService(db)
+    movies, total = service.get_movies_paginated(page=page, limit=limit, search=search)
 
     if not movies:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="No movies found for this page."
         )
+        
     return MovieListResponse(
         movies=movies,
         page=page,
