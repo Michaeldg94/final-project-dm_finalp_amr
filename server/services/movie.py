@@ -1,4 +1,4 @@
-'''
+
 from typing import List
 
 from sqlalchemy import select
@@ -14,6 +14,10 @@ class MovieService(BaseService):
 
     def get_movies(self, year: int, rating: float) -> List[MovieSchema]:
         return MovieDataManager(self.session).get_movies(year, rating)
+    
+    def get_movies_paginated(self, page: int, page_size: int = 10) -> List[MovieSchema]:
+        """Return a paginated list of movies."""
+        return MovieDataManager(self.session).get_movies_paginated(page, page_size)
 
 
 class MovieDataManager(BaseDataManager):
@@ -35,4 +39,15 @@ class MovieDataManager(BaseDataManager):
             schemas += [MovieSchema(**model.to_dict())]
 
         return schemas
-'''
+   
+    def get_movies_paginated(self, page: int, page_size: int = 10) -> List[MovieSchema]:
+        """Return a list of movies for a given page."""
+        offset = (page - 1) * page_size
+        stmt = (
+        select(MovieModel)
+        .order_by(MovieModel.movie_id)  # ✅ ensures consistent order
+        .offset(offset)
+        .limit(page_size)
+    )
+        models = self.get_all(stmt)
+        return [MovieSchema(**m.to_dict()) for m in models]

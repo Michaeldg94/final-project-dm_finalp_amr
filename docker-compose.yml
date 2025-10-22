@@ -11,7 +11,6 @@ services:
     ports:
       - "8081:8081"
   postgres:
-    hostname: ${POSTGRES_HOST}
     image: postgres:latest
     container_name: postgres_container1
     environment:
@@ -20,20 +19,36 @@ services:
       - POSTGRES_DB=${POSTGRES_DB}
     volumes:
       - pgdata:/var/lib/postgresql/data
-    ports:
+    ports:  
       - ${POSTGRES_EXPOSED_PORT}:${POSTGRES_PORT}
   backend:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: backend_container
+    working_dir: /code
+    command: >
+      sh -c "uvicorn server.app:app --host 0.0.0.0 --port 8000 --reload"
     environment:
-      - PYTHONUNBUFFERED=1
+      PYTHONUNBUFFERED: "1"
+      DOCKER_ENV: "true"
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: ${POSTGRES_PORT}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-movies_db}
+    depends_on:
+    - postgres
     volumes:
       - ./server:/code/server
       - ./frontend:/code/frontend
       - ./scripts:/code/scripts
-      - ./.env/:/code/.env
+      - ./.env:/code/.env
       - ./alembic:/code/alembic
       - ./alembic.ini:/code/alembic.ini
       - ./data:/code/data
+    ports:
+      - "8000:8000"
 
 volumes:
   pgdata:

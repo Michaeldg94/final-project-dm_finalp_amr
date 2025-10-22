@@ -10,3 +10,4 @@ RUN python -m pip install poetry
 RUN poetry self add poetry-plugin-export
 RUN poetry export --output=requirements.txt
 RUN python -m pip install -r requirements.txt
+COPY . .

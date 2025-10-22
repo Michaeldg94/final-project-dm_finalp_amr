@@ -2,7 +2,7 @@ from typing import List
 
 from pydantic import BaseModel
 
-from server.schemas.genres import GenreSchema
+from server.schemas.genres import GenreSchema, GenrePublicSchema
 
 
 # =======================================
@@ -11,11 +11,10 @@ from server.schemas.genres import GenreSchema
 class MovieSchema(BaseModel):
     movie_id: int
     title: str
-    genres: List[GenreSchema] = []
+    genres: List[GenrePublicSchema] = []
 
     class Config:
-        orm_mode = True
-
+        from_attributes = True 
 
 # =======================================
 #      MOVIE LIST RESPONSE SCHEMA
@@ -25,6 +24,12 @@ class MovieListResponse(BaseModel):
     total: int
     page: int
     limit: int
+    
+   
+    
+    class Config:
+        from_attributes = True 
+
 
 
 class MovieResponse(BaseModel):

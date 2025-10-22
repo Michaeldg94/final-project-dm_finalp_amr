@@ -41,3 +41,9 @@ class PostgresSessionManager:
             raise
         finally:
             session.close()
+session_manager = PostgresSessionManager()
+
+def get_db():
+    """FastAPI dependency that yields a database session."""
+    with session_manager.open_session() as session:
+        yield session

@@ -1,11 +1,13 @@
 from typing import Generator
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
+from sqlalchemy import func, or_
+
 
 from server.backend.postgres import PostgresSessionManager
-from server.models import MovieModel
-from server.schemas.movie import MovieResponse
+from server.models import MovieModel, GenreModel
+from server.schemas.movie import MovieResponse, MovieListResponse
 
 router = APIRouter(prefix="/movies", tags=["Movies"])
 
@@ -17,7 +19,6 @@ def get_db() -> Generator[Session, None, None]:
     with session_manager.open_session() as session:
         yield session
 
-
 @router.get("/{movie_id}", response_model=MovieResponse)
 async def get_movie(movie_id: int, db: Session = Depends(get_db)):
     movie = db.query(MovieModel).filter(MovieModel.movie_id == movie_id).first()
@@ -27,9 +28,49 @@ async def get_movie(movie_id: int, db: Session = Depends(get_db)):
         )
     return movie
 
+@router.get("/", response_model=MovieListResponse)
+async def get_movie_list(page: int = Query(1, ge=1, description="Page number (starts at 1)"),
+                        limit: int = Query(10, ge=1, le=100, description="Number of movies per page"),
+                        search: str | None = Query(None, description="Search in title or genre name"),
+                        db: Session = Depends(get_db)):
+    offset = (page - 1) * limit
+    
+    query = db.query(MovieModel)
+
+    
+    if search:
+        search_term = f"%{search.lower()}%"
+        query = (
+            query.join(MovieModel.genres)
+            .filter(
+                or_(
+                func.lower(MovieModel.title).like(search_term),
+                func.lower(GenreModel.genre_name)==search_term
+            ))
+            .distinct()
+        )
+
+    total = query.count()
+    movies = query.offset(offset).limit(limit).all()
+
+   
+
+    if not movies:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No movies found for this page."
+        )
+    return {
+        "movies": movies,
+        "page": page,
+        "limit":limit,
+        "total": total,
+
+    }
 
 """
-DOES NOT WORK
+DOES NOT WORK        "total": total,
+
 @router.get("/{movie_id}", response_model=MovieModel)
 async def get_movie(movie_id: int, db: Session = Depends(get_db)):
     movie = db.query(MovieModel).filter(MovieModel.movie_id == movie_id).first()
