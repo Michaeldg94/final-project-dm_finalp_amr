@@ -1,7 +1,9 @@
 
 from typing import List, Optional, Tuple
 
-from sqlalchemy import select, func, or_
+from sqlalchemy import select, func, or_, case
+from sqlalchemy.dialects import postgresql
+
 
 from server.models.movies import MovieModel
 from server.models.ratings import RatingModel
@@ -70,18 +72,42 @@ class MovieDataManager(BaseDataManager):
         offset = (page - 1) * limit
 
         # Base query
-        stmt = select(MovieModel).distinct().join(MovieModel.genres, isouter=True)
+        stmt = select(MovieModel).join(MovieModel.genres, isouter=True)
 
         # Apply search filter
         if search:
-            search_term = f"%{search.lower()}%"
+            search_lower = search.lower()
+            search_term = f"%{search_lower}%"
+
+            # WHERE filters (match title or genre)
             stmt = stmt.where(
                 or_(
                     func.lower(MovieModel.title).like(search_term),
-                    func.lower(GenreModel.genre_name) == search_term,
+                    func.lower(GenreModel.genre_name).like(search_term),
                 )
             )
 
+            # ORDER BY relevance (title exact > title partial > genre match)
+            stmt = stmt.order_by(
+                case((func.lower(MovieModel.title) == search_lower, 3), else_=0).desc(),
+                case((func.lower(MovieModel.title).like(search_term), 2), else_=0).desc(),
+                case((func.lower(GenreModel.genre_name).like(search_term), 1), else_=0).desc(),
+                MovieModel.title.asc(),
+            )
+
+        else:
+            # Default ordering if no search term
+            stmt = stmt.order_by(MovieModel.title.asc())
+
+        print("\n=== DEBUG SQL ===")
+        print(
+            stmt.compile(
+                dialect=postgresql.dialect(),
+                compile_kwargs={"literal_binds": True}
+            ),
+            flush=True
+        )
+        print("=================\n")
         # Count total
         count_stmt = (
             select(func.count(func.distinct(MovieModel.movie_id)))
@@ -93,7 +119,7 @@ class MovieDataManager(BaseDataManager):
             count_stmt = count_stmt.where(
                 or_(
                     func.lower(MovieModel.title).like(search_term),
-                    func.lower(GenreModel.genre_name) == search_term,
+                    func.lower(GenreModel.genre_name).like(search_term),
                 )
             )
 
@@ -101,6 +127,7 @@ class MovieDataManager(BaseDataManager):
 
         # Fetch paginated results
         stmt = stmt.offset(offset).limit(limit)
+
         models = self.get_all(stmt)
 
         return models, total

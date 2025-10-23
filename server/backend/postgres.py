@@ -12,6 +12,7 @@ class PostgresSessionManager:
         if engine_kwargs is None:
             engine_kwargs = {}
         self.engine = create_engine(config.postgres_dns, **engine_kwargs)
+        #self.engine = create_engine(config.postgres_dns, **engine_kwargs, echo=True, future=True)    # ✅ this logs all SQL statements to stdout
         self.sessionmaker = sessionmaker(
             autocommit=False,
             bind=self.engine,
