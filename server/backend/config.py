@@ -9,16 +9,16 @@ class Config(BaseSettings):
     from ``.env`` file.
     """
 
-    postgres_user: str = Field(min_length=1)
-    postgres_password: str = Field(min_length=1)
-    postgres_db: str = Field(min_length=1)
-    postgres_host: str = Field(min_length=1)
+    postgres_user: str = Field(min_length = 1)
+    postgres_password: str = Field(min_length = 1)
+    postgres_db: str = Field(min_length = 1)
+    postgres_host: str = Field(min_length = 1)
     postgres_port: int = Field()
     postgres_exposed_port: int | None = Field(None)
     model_config = SettingsConfigDict(
-        env_file=".env",
-        case_sensitive=False,
-        env_file_encoding="utf-8",
+        env_file = ".env",
+        case_sensitive = False,
+        env_file_encoding = "utf-8",
     )
 
     @property

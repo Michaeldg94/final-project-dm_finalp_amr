@@ -1,3 +1,14 @@
+"""Convenience imports for ORM models.
+
+This module re-exports the most commonly used SQLAlchemy models so you
+can write clean imports like:
+
+    from server.models import UserModel, MovieModel
+
+instead of importing from each submodule.
+"""
+
+
 from server.models.genres import GenreModel
 from server.models.movies import MovieModel
 from server.models.movies_genres import MovieGenreModel

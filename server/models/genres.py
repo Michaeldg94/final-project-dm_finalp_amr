@@ -1,3 +1,8 @@
+"""Genre ORM model.
+
+Represents a single movie genre (e.g., Action, Drama) and its link to movies.
+"""
+
 from typing import TYPE_CHECKING
 
 from sqlalchemy import Integer, String
@@ -12,12 +17,13 @@ else:
 
 
 class GenreModel(BaseSQLModel):
+    """A movie genre and its associated movies."""
     __tablename__ = "genres"
 
-    genre_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    genre_name: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
+    genre_id: Mapped[int] = mapped_column(Integer, primary_key = True, autoincrement = True)
+    genre_name: Mapped[str] = mapped_column(String(50), unique = True, nullable = False)
 
     # Relationships
     movies: Mapped[list[MovieModel]] = relationship(
-        secondary="movie_genres", back_populates="genres"
+        secondary = "movie_genres", back_populates = "genres"
     )

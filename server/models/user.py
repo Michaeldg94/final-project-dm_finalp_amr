@@ -1,3 +1,9 @@
+"""User ORM model.
+
+Represents an application user who can rate movies.
+"""
+
+
 from typing import TYPE_CHECKING
 
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -11,11 +17,17 @@ else:
 
 
 class UserModel(BaseSQLModel):
+    """A single user of the application.
+
+    Attributes:
+        user_id: Retrieves primary key.
+        ratings: All ratings rated by this user.
+    """
     __tablename__ = "users"
 
-    user_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(primary_key = True, autoincrement = True)
 
     # Relationships
     ratings: Mapped[list[RatingModel]] = relationship(
-        back_populates="user", cascade="all, delete-orphan"
+        back_populates = "user", cascade = "all, delete-orphan"
     )

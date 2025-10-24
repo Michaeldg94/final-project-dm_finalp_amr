@@ -1,4 +1,10 @@
 
+"""Movie service and data access layer.
+
+Exposes high-level methods for fetching movies, paginating/searching,
+and computing aggregate rating stats. Uses SQLAlchemy (sync).
+"""
+
 from typing import List, Optional, Tuple
 
 from sqlalchemy import select, func, or_, case
@@ -15,17 +21,31 @@ from server.services.base import BaseDataManager, BaseService
 #           SERVICE LAYER
 # ======================================
 class MovieService(BaseService):
+    """Application-facing operations for movies."""
+
     def get_movie(self, movie_id: int) -> MovieSchema:
+        """Return a single movie mapped to a schema."""
         return MovieDataManager(self.session).get_movie(movie_id)
 
     def get_movies(self, year: int, rating: float) -> List[MovieSchema]:
+        """Return all movies filtered by release year and minimum rating."""
         return MovieDataManager(self.session).get_movies(year, rating)
     
     def get_movies_paginated(
         self, page: int, limit: int, search: Optional[str] = None
     ) -> Tuple[List[MovieSchema], int]:
         
-        """Return paginated MovieSchema list and total count."""
+        """Return a page of movies (as schemas) plus the total count.
+
+        Args:
+            page: 1-based page index.
+            limit: max items per page.
+            search: optional case-insensitive filter on title or genre.
+
+        Returns:
+            (schemas, total) where `schemas` is the list of `MovieSchema` and
+            `total` is the total number of matching movies.
+        """
         
         models, total = MovieDataManager(self.session).get_movies_paginated(
             page=page, limit=limit, search=search
@@ -35,6 +55,7 @@ class MovieService(BaseService):
         return schemas, total
     
     def get_avg_rating(self, movie_id: int):
+        """Return title, avg_rating, and total_ratings for a movie (or None)."""
         return MovieDataManager(self.session).avg_rating(movie_id)
 
 
@@ -43,13 +64,16 @@ class MovieService(BaseService):
 # ======================================
 
 class MovieDataManager(BaseDataManager):
+    """SQLAlchemy queries for movie data."""
     def get_movie(self, movie_id: int) -> MovieSchema:
+        """Fetch a single movie and map it to `MovieSchema`."""
         stmt = select(MovieModel).where(MovieModel.movie_id == movie_id)
         model = self.get_one(stmt)
 
         return MovieSchema(**model.to_dict())
 
     def get_movies(self, year: int, rating: float) -> List[MovieSchema]:
+        """Fetch movies by year and minimum rating (example filter)."""
         schemas: List[MovieSchema] = list()
 
         stmt = select(MovieModel).where(
@@ -68,7 +92,7 @@ class MovieDataManager(BaseDataManager):
         limit: int = 10,
         search: Optional[str] = None,
     ) -> Tuple[List[MovieModel], int]:
-        """Return a list of MovieModel instances and total count."""
+        """Return a list of MovieModel instances and total count (with search)."""
         offset = (page - 1) * limit
 
         # Base query

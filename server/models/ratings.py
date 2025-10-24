@@ -1,3 +1,9 @@
+"""Clean user - movie ratings.
+
+Stores unique ratings with basic validation (range and uniqueness)
+and links to the `users` and `movies` tables.
+"""
+
 from datetime import datetime
 from typing import TYPE_CHECKING
 
@@ -23,6 +29,12 @@ else:
 
 
 class RatingModel(BaseSQLModel):
+    """A single user's rating for a movie.
+
+    Constraints:
+        - rating is between 0.5 and 5.0
+        - (user_id, movie_id) is unique (one rating per user per movie)
+    """
     __tablename__ = "ratings"
     __table_args__ = (
         CheckConstraint("rating >= 0.5 AND rating <= 5.0"),
@@ -30,17 +42,17 @@ class RatingModel(BaseSQLModel):
     )
 
     rating_id: Mapped[int] = mapped_column(
-        Integer, primary_key=True, autoincrement=True
+        Integer, primary_key = True, autoincrement = True
     )
     user_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("users.user_id"), nullable=False, index=True
+        Integer, ForeignKey("users.user_id"), nullable = False, index = True
     )
     movie_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("movies.movie_id"), nullable=False, index=True
+        Integer, ForeignKey("movies.movie_id"), nullable = False, index = True
     )
-    rating: Mapped[float] = mapped_column(Numeric(2, 1), nullable=False)
-    timestamp: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    rating: Mapped[float] = mapped_column(Numeric(2, 1), nullable = False)
+    timestamp: Mapped[datetime] = mapped_column(DateTime, nullable = False)
 
     # Relationships
-    user: Mapped[UserModel] = relationship(back_populates="ratings")
-    movie: Mapped[MovieModel] = relationship(back_populates="ratings")
+    user: Mapped[UserModel] = relationship(back_populates = "ratings")
+    movie: Mapped[MovieModel] = relationship(back_populates = "ratings")
