@@ -1,7 +1,7 @@
 """FastAPI application entrypoint."""
 
 from fastapi import FastAPI
-from .routers import movie, ratings
+from .routers import movie, ratings, recommendation
 from typing import Dict
 
 
@@ -25,3 +25,4 @@ def read_root() -> Dict[str, str]:
 # Routers
 app.include_router(movie.router)
 app.include_router(ratings.router)
+app.include_router(recommendation.router) 
