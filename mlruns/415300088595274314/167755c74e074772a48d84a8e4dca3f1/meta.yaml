@@ -1,0 +1,14 @@
+artifact_uri: file:///home/michael/Desktop/BSE_DSM/FirstTerm/DataManagement/DataManagement_github/final-project-dm_finalp_amr/mlruns/415300088595274314/167755c74e074772a48d84a8e4dca3f1/artifacts
+end_time: 1761316551972
+entry_point_name: ''
+experiment_id: '415300088595274314'
+lifecycle_stage: active
+run_id: 167755c74e074772a48d84a8e4dca3f1
+run_name: nmf-train-k40
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1761316551958
+status: 3
+tags: []
+user_id: michael
