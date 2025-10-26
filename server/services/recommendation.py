@@ -23,6 +23,9 @@ import os
 from typing import List, Tuple
 
 import mlflow
+from mlflow.tracking import MlflowClient
+from mlflow.exceptions import MlflowException
+
 import numpy as np
 import pandas as pd
 from scipy.sparse import coo_matrix, csr_matrix
@@ -36,21 +39,45 @@ EXPERIMENT_NAME: str = "RecommendationEngine"
 
 
 def _ensure_experiment() -> str:
-    """Ensure the MLflow experiment exists and is set as current.
+    """Ensure the MLflow experiment exists (restoring if soft-deleted) and set it active.
 
     Returns
     -------
     str
-        The experiment ID (string) for the configured experiment.
+        The experiment ID for the configured experiment (or a restored fallback).
     """
     mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", "file:./mlruns"))
-    exp = mlflow.get_experiment_by_name(EXPERIMENT_NAME)
+    client = MlflowClient()
+
+    # Try to find by name
+    exp = client.get_experiment_by_name(EXPERIMENT_NAME)
+
     if exp is None:
-        exp_id = mlflow.create_experiment(EXPERIMENT_NAME)
+        # Fresh create
+        exp_id = client.create_experiment(EXPERIMENT_NAME)
     else:
         exp_id = exp.experiment_id
-    mlflow.set_experiment(EXPERIMENT_NAME)
-    return exp_id
+        # If soft-deleted, restore it
+        if getattr(exp, "lifecycle_stage", None) == "deleted":
+            client.restore_experiment(exp_id)
+
+    # Try to set the experiment active. If it still fails (rare edge cases),
+    # fall back to a new, safe name '-restored'.
+    try:
+        mlflow.set_experiment(EXPERIMENT_NAME)
+        return exp_id
+    except MlflowException:
+        fallback = f"{EXPERIMENT_NAME}-restored"
+        exp2 = client.get_experiment_by_name(fallback)
+        if exp2 is None:
+            exp_id = client.create_experiment(fallback)
+        else:
+            exp_id = exp2.experiment_id
+            if getattr(exp2, "lifecycle_stage", None) == "deleted":
+                client.restore_experiment(exp_id)
+        mlflow.set_experiment(fallback)
+        return exp_id
+
 
 
 def _fetch_ratings_df(db: Session) -> pd.DataFrame:
@@ -220,9 +247,9 @@ def train_and_log_model(db: Session, n_components: int = 40, random_state: int =
     df = _fetch_ratings_df(db)
     df = _prune_to_trainable(
         df,
-        min_user_ratings=3,   # tune as you like
-        min_item_ratings=3,
-        max_users=120_000,    # raise/lower based on your machine
+        min_user_ratings=3,   # minimum users ratings
+        min_item_ratings=3,   # minimum rated movies
+        max_users=120_000,    # raise/lower based on local machine
         max_items=50_000,
     )
     if df.empty:
