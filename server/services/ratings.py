@@ -4,7 +4,7 @@ Provides creation of ratings with validation against users/movies and
 the unique (user_id, movie_id) constraint.
 """
 
-from datetime import datetime
+from datetime import datetime, UTC
 
 from sqlalchemy import and_, select
 from sqlalchemy.exc import IntegrityError
@@ -68,7 +68,7 @@ class RatingDataManager(BaseDataManager):
             user_id=payload.user_id,
             movie_id=payload.movie_id,
             rating=payload.rating,
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(UTC),
         )
 
         self.session.add(model)
