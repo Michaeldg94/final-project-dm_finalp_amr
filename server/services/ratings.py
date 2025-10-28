@@ -26,8 +26,8 @@ class RatingService(BaseService):
 
 class RatingDataManager(BaseDataManager):
     """Sync data-access helper for ratings."""
-    def _init_(self, session: Session):
-        super()._init_(session)
+    def __init__(self, session: Session):
+        super().__init__(session)
 
     # ---- helpers ------------------------------------------------------------
     def _ensure_movie_exists(self, movie_id: int) -> None:
