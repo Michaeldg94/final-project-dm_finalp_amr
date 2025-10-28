@@ -16,7 +16,6 @@ from server.models.user import UserModel
 from server.schemas.ratings import RatingCreate, RatingResponse
 from server.services.base import BaseDataManager, BaseService
 
-
 class RatingService(BaseService):
     """Service layer for ratings; returns Pydantic RatingResponse."""
 
@@ -53,13 +52,8 @@ class RatingDataManager(BaseDataManager):
 
     # ---- public API ---------------------------------------------------------
     def create_rating(self, payload: RatingCreate) -> RatingResponse:
-        """
-        Creates a rating and returns a RatingResponse (Pydantic).
-        Raises ValueError with one of:
-          - "Movie not found"
-          - "User not found"
-          - "User already rated this movie"
-        """
+
+        #We ensure the given parameters are valid and exists in the database
         self._ensure_movie_exists(payload.movie_id)
         self._ensure_user_exists(payload.user_id)
         self._ensure_not_already_rated(payload.user_id, payload.movie_id)

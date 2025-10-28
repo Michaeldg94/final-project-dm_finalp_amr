@@ -1,11 +1,4 @@
-"""Router-level tests for the Ratings API.
-
-These tests verify the behavior of the /api/rest/v1/ratings endpoints.
-They never touch a real database and instead:
-- Override the router’s `get_db` dependency with a fake session.
-- Monkeypatch the router’s imported `RatingService` to return
-  deterministic responses or raise controlled exceptions.
-"""
+"""Router-level tests for the Ratings API."""
 
 from __future__ import annotations
 

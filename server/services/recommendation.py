@@ -33,19 +33,12 @@ from sklearn.decomposition import NMF
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from server.models import RatingModel  # must have: user_id, movie_id, rating
+from server.models import RatingModel
 
 EXPERIMENT_NAME: str = "RecommendationEngine"
 
-
 def _ensure_experiment() -> str:
-    """Ensure the MLflow experiment exists (restoring if soft-deleted) and set it active.
-
-    Returns
-    -------
-    str
-        The experiment ID for the configured experiment (or a restored fallback).
-    """
+    """Ensure the MLflow experiment exists (restoring if soft-deleted) and set it active."""
     mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", "file:./mlruns"))
     client = MlflowClient()
 
@@ -78,27 +71,8 @@ def _ensure_experiment() -> str:
         mlflow.set_experiment(fallback)
         return exp_id
 
-
-
 def _fetch_ratings_df(db: Session) -> pd.DataFrame:
-    """Fetch ratings as a pandas DataFrame with strict dtypes and validity checks.
-
-    Parameters
-    ----------
-    db : Session
-        Active SQLAlchemy session.
-
-    Returns
-    -------
-    pandas.DataFrame
-        Columns: ['user_id', 'movie_id', 'rating'] with types (int, int, float).
-        Filters out nulls and negative ratings.
-
-    Raises
-    ------
-    ValueError
-        If no ratings are found in the database.
-    """
+    """Fetch ratings as a pandas DataFrame with strict dtypes and validity checks."""
     rows = db.execute(
         select(RatingModel.user_id, RatingModel.movie_id, RatingModel.rating)
     ).all()
@@ -121,29 +95,7 @@ def _prune_to_trainable(
     max_users: int = 120_000,
     max_items: int = 50_000,
 ) -> pd.DataFrame:
-    """Prune long-tail users/items and cap to the most-active slice.
-
-        Iteratively removes users and items with fewer than the minimum number of ratings,
-        then caps to top-N most-active users/items to keep training feasible on a single node.
-
-        Parameters
-        ----------
-        df : pandas.DataFrame
-            Input ratings with columns ['user_id', 'movie_id', 'rating'].
-        min_user_ratings : int, optional
-            Minimum ratings per user to retain, by default 3.
-        min_item_ratings : int, optional
-            Minimum ratings per item to retain, by default 3.
-        max_users : int, optional
-            Maximum distinct users to keep (most-active), by default 120_000.
-        max_items : int, optional
-            Maximum distinct items to keep (most-active), by default 50_000.
-
-        Returns
-        -------
-        pandas.DataFrame
-            Pruned ratings DataFrame (may be empty if thresholds are too strict).
-    """
+    """Prune long-tail users/items and cap to the most-active slice."""
     if df.empty:
         return df
 
@@ -180,20 +132,7 @@ def _prune_to_trainable(
 
 
 def _build_user_item_sparse(df: pd.DataFrame) -> Tuple[csr_matrix, List[int], List[int]]:
-    """Build a sparse CSR user–item matrix and ID mappings.
-
-    Parameters
-    ----------
-    df : pandas.DataFrame
-        Ratings with columns ['user_id', 'movie_id', 'rating'] (non-negative).
-
-    Returns
-    -------
-    tuple[csr_matrix, list[int], list[int]]
-        - mat: CSR matrix of shape (num_users, num_items), dtype float32
-        - users: list of user IDs in row order
-        - items: list of movie IDs in column order
-    """
+    """Build a sparse CSR user–item matrix and ID mappings."""
     users = np.sort(df["user_id"].astype(int).unique())
     items = np.sort(df["movie_id"].astype(int).unique())
 
@@ -202,7 +141,7 @@ def _build_user_item_sparse(df: pd.DataFrame) -> Tuple[csr_matrix, List[int], Li
 
     rows = df["user_id"].map(user_index).to_numpy()
     cols = df["movie_id"].map(item_index).to_numpy()
-    data = df["rating"].astype(np.float32).to_numpy()  # non-negative ensured above
+    data = df["rating"].astype(np.float32).to_numpy()
 
     mat = coo_matrix(
         (data, (rows, cols)),
@@ -213,34 +152,7 @@ def _build_user_item_sparse(df: pd.DataFrame) -> Tuple[csr_matrix, List[int], Li
 
 
 def train_and_log_model(db: Session, n_components: int = 40, random_state: int = 42) -> str:
-    """Train NMF on pruned sparse ratings and log a new MLflow run.
-
-    Steps:
-    - Fetch ratings and prune long-tail users/items.
-    - Build a CSR matrix.
-    - Choose k = min(requested_k, num_users, num_items).
-    - Fit NMF (CSR supported by scikit-learn).
-    - Log artifacts (W, H, users, items) and metrics to MLflow.
-
-    Parameters
-    ----------
-    db : Session
-        Active SQLAlchemy session.
-    n_components : int, optional
-        Requested latent dimensionality, capped by data shape, by default 40.
-    random_state : int, optional
-        RNG seed for reproducibility, by default 42.
-
-    Returns
-    -------
-    str
-        The MLflow run ID for the newly logged training run.
-
-    Raises
-    ------
-    ValueError
-        If no data is available after pruning, or data is insufficient.
-    """
+    """Train NMF on pruned sparse ratings and log a new MLflow run."""
     _ensure_experiment()
 
     # Load & prune
@@ -304,18 +216,7 @@ def train_and_log_model(db: Session, n_components: int = 40, random_state: int =
 
 
 def _load_latest_model() -> Tuple[np.ndarray, np.ndarray, List[int], List[int]]:
-    """Load the latest MLflow run artifacts for inference.
-
-    Returns
-    -------
-    tuple[np.ndarray, np.ndarray, list[int], list[int]]
-        W (users × k), H (k × items), users (row→user_id), items (col→movie_id).
-
-    Raises
-    ------
-    RuntimeError
-        If no past training runs are found.
-    """
+    """Load the latest MLflow run artifacts for inference."""
     _ensure_experiment()
     client = mlflow.tracking.MlflowClient()
     exp = mlflow.get_experiment_by_name(EXPERIMENT_NAME)
@@ -347,24 +248,9 @@ def _load_latest_model() -> Tuple[np.ndarray, np.ndarray, List[int], List[int]]:
 
 def recommend_for_user(user_id: int, n: int = 10) -> Tuple[List[int], List[float]]:
     """Return top-N recommended movie IDs and normalized scores for a user.
-
     Loads the most recent MLflow run, reconstructs item scores for the given user
     (or uses a popularity-based fallback for unseen users), and returns the top-N
-    items with min–max normalized scores that sum to ~1.
-
-    Parameters
-    ----------
-    user_id : int
-        The target user ID.
-    n : int, optional
-        Number of items to return, by default 10.
-
-    Returns
-    -------
-    tuple[list[int], list[float]]
-        - movie_ids: list of item IDs in descending score order
-        - probabilities: list of normalized scores summing to ~1
-    """
+    items with min–max normalized scores that sum to ~1."""
     W, H, users, items = _load_latest_model()
     user_to_row = {u: i for i, u in enumerate(users)}
 

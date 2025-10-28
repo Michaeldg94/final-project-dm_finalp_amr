@@ -10,7 +10,6 @@ from typing import List, Optional, Tuple
 from sqlalchemy import select, func, or_, case
 from sqlalchemy.dialects import postgresql
 
-
 from server.models.movies import MovieModel
 from server.models.ratings import RatingModel
 from server.models.genres import GenreModel

@@ -1,17 +1,4 @@
-"""Router-level tests for the Recommendation endpoints.
-
-What we cover here:
-
-1) Async training flow (BackgroundTasks)
-   - POST /api/rest/v1/recommendation-engine → 202 + {task_id,"queued"}
-   - GET  /api/rest/v1/recommendation-engine/{task_id} → eventually "done" with run_id
-   - Error path: background exception → status "error" with message
-
-2) Inference endpoint
-   - GET /api/rest/v1/user/{user_id}/recommended-movies?n=... → 200 happy path
-   - Service exception → 500 with error detail
-   - Validation of `n` (must be gt=0 and le=100) → 422
-"""
+"""Router-level tests for the Recommendation endpoints."""
 
 from __future__ import annotations
 

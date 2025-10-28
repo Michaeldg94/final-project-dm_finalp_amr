@@ -1,11 +1,3 @@
-"""Movies API endpoints.
-
-Provides:
-- GET /{movie_id}: Fetch a single movie by id.
-- GET /: Paginated list of movies with optional search by title/genre.
-- GET /{movie_id}/avg-rating: Average rating and count for a movie.
-"""
-
 from typing import Generator
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
@@ -19,76 +11,61 @@ from server.schemas.movie import MovieResponse, MovieListResponse, MovieAvgRatin
 from server.services.movie import MovieService
 
 
-router = APIRouter(prefix = "/api/rest/v1/movies", tags = ["Movies"])
+router = APIRouter(prefix="/api/rest/v1/movies", tags=["Movies"])
 
 session_manager = PostgresSessionManager()
 
 
-# 🔹 Dependencia para inyectar la sesión en las rutas
 def get_db() -> Generator[Session, None, None]:
     """FastAPI dependency that yields a SQLAlchemy `Session`."""
     with session_manager.open_session() as session:
         yield session
 
-@router.get("/{movie_id}", response_model = MovieResponse)
-async def get_movie(movie_id: int, db: Session = Depends(get_db)) -> MovieResponse:
-    """Return a single movie by its ID.
+@router.get("/", response_model=MovieListResponse)
+async def get_movie_list(page: int = Query(1, ge=1, description="Page number (starts at 1)"),
+                        limit: int = Query(10, ge=1, le=100, description="Number of movies per page"),
+                        search: str | None = Query(None, description="Search in title or genre name"),
+                        db: Session = Depends(get_db)):
+    offset = (page - 1) * limit
+    
+    query = db.query(MovieModel)
 
-    Raises:
-        HTTPException: 404 if the movie does not exist.
-    """
-    movie: Optional[MovieModel] = (db.query(MovieModel).filter(MovieModel.movie_id == movie_id).first())
-    if not movie:
-        raise HTTPException(
-            status_code = status.HTTP_404_NOT_FOUND, detail = "Movie not found"
+    if search:
+        search_term = f"%{search.lower()}%"
+        query = (
+            query.join(MovieModel.genres)
+            .filter(
+                or_(
+                func.lower(MovieModel.title).like(search_term),
+                func.lower(GenreModel.genre_name)==search_term
+            ))
+            .distinct()
         )
-    return movie
 
-@router.get("/", response_model = MovieListResponse)
-async def get_movie_list(page: int = Query(1, ge = 1, description = "Page number (starts at 1)"),
-                        limit: int = Query(10, ge = 1, le = 100, description = "Number of movies per page"),
-                        search: str | None = Query(None, description = "Search in title or genre name"),
-                        db: Session = Depends(get_db)) -> MovieListResponse:
-    """Return a paginated list of movies, optionally filtered by a search term.
-
-    Args:
-        page: 1-based page index.
-        limit: Page size (1–100).
-        search: Case-insensitive match on movie title or genre name.
-
-    Raises:
-        HTTPException: 404 if no movies are found for the requested page/search.
-    """
-    service = MovieService(db)
-    movies, total = service.get_movies_paginated(page = page, limit = limit, search = search)
+    total = query.count()
+    movies = query.offset(offset).limit(limit).all()
 
     if not movies:
         raise HTTPException(
-            status_code = status.HTTP_404_NOT_FOUND,
-            detail = "No movies found for this page."
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No movies found for this page."
         )
-        
     return MovieListResponse(
-        movies = movies,
-        page = page,
-        limit = limit,
-        total = total,
+        movies=movies,
+        page=page,
+        limit=limit,
+        total=total,
     )
 
 @router.get("/{movie_id}/avg-rating", response_model=MovieAvgRatingResponse)
-async def get_movie_avg_rating(movie_id: int, db: Session = Depends(get_db)) -> MovieAvgRatingResponse:
-    """Return the average rating and rating count for a movie.
-
-    Raises:
-        HTTPException: 404 if the movie does not exist or has no ratings.
-    """
+async def get_movie_avg_rating(movie_id: int, db: Session = Depends(get_db)):
     service = MovieService(db)
     row = service.get_avg_rating(movie_id)
 
     if not row:
         raise HTTPException(
-            status_code = status.HTTP_404_NOT_FOUND,
-            detail = f"Movie with id {movie_id} not found or has no ratings."
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Movie with id {movie_id} not found or has no ratings."
         )
 
     # row is a SQLAlchemy Row object
@@ -96,82 +73,9 @@ async def get_movie_avg_rating(movie_id: int, db: Session = Depends(get_db)) -> 
     total_ratings = int(row.total_ratings) if row.total_ratings is not None else 0
 
     return MovieAvgRatingResponse(
-    movie_id = row.movie_id,
-    title = row.title,
-    avg_rating = avg_rating,
-    total_ratings = total_ratings,
+    movie_id=row.movie_id,
+    title=row.title,
+    avg_rating=avg_rating,
+    total_ratings=total_ratings,
     )
 
-"""
-DOES NOT WORK        "total": total,
-
-@router.get("/{movie_id}", response_model=MovieModel)
-async def get_movie(movie_id: int, db: Session = Depends(get_db)):
-    movie = db.query(MovieModel).filter(MovieModel.movie_id == movie_id).first()
-    if not movie:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="hiiiiiiiiii")
-    return movie
-"""
-
-"""
-@router.get("/{movie_id}", response_model=MovieAvgRatingResponse)
-async def get_movie(movie_id: int, db: Session = Depends(get_db)):
-    movie = db.query(MovieModel).filter(MovieModel.id == movie_id).first()
-    if not movie:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Movie with id {movie_id} not found",
-        )
-    return movie
-"""
-
-'''
-@router.get("/{movie_id}/avg-rating", response_model=MovieAvgRatingResponse)
-async def movie_avg_rating(
-    movie_id: int,
-    db: Annotated[Session, Depends(get_db)] = Depends(),
-) -> MovieAvgRatingResponse:
-    row = svc.avg_rating(movie_id)
-    if not row:
-        raise HTTPException(status_code=404, detail="movie_not_found")
-    return {
-        "movie_id": row.movie_id,
-        "title": row.title,
-        "avg_rating": round(float(row.avg_rating), 3)
-        if row.avg_rating is not None
-        else 0.0,
-        "total_ratings": int(row.total_ratings),
-    }
-
-    """offset = (page - 1) * limit
-
-    # Base query
-    query = select(MovieModel).distinct().join(MovieModel.genres, isouter=True)
-
-    # Apply search if provided
-    if search:
-        search_term = f"%{search.lower()}%"
-        query = query.where(
-            func.lower(MovieModel.title).like(search_term)
-            | func.lower(GenreModel.genre_name).like(search_term)
-        )
-
-    # Count total results
-    total_query = select(func.count(func.distinct(MovieModel.movie_id))).select_from(
-        MovieModel
-    ).join(MovieModel.genres, isouter=True)
-
-    if search:
-        total_query = total_query.where(
-            func.lower(MovieModel.title).like(search_term)
-            | func.lower(GenreModel.genre_name).like(search_term)
-        )
-
-    total = (await session.execute(total_query)).scalar_one()
-
-    # Fetch paginated results
-    query = query.offset(offset).limit(limit)
-    result = await session.execute(query)
-    movies = result.scalars().unique().all()
-"""
-'''

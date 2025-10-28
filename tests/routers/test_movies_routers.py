@@ -61,20 +61,7 @@ def client(app: FastAPI) -> TestClient:
 # ─────────────────────── Helper for GET /{movie_id} route ─────────────────────
 
 def _fake_db_for_get_movie(found: bool = True) -> Any:
-    """Return a fake DB session for the direct-DB route.
-
-    The Movies `GET /{movie_id}` route does:
-        db.query(MovieModel).filter(...).first()
-
-    This helper returns a fake session whose `query().filter().first()` chain
-    returns a simple object if `found=True`, or `None` otherwise.
-
-    Args:
-        found: Whether the fake DB should "find" a movie.
-
-    Returns:
-        A fake session object with the minimal interface used by the route.
-    """
+    """Return a fake DB session for the direct-DB route."""
 
     class _FakeQuery:
         def filter(self, *_args: Any, **_kwargs: Any) -> "_FakeQuery":
@@ -120,11 +107,7 @@ def test_get_movie_404(client: TestClient) -> None:
 # ─────────────────────────────── Tests: GET / ─────────────────────────────────
 
 def test_get_movie_list_200(client: TestClient, monkeypatch: "MonkeyPatch") -> None:
-    """It returns a paginated list using a mocked MovieService.
-
-    We patch the *router's* imported `MovieService` so the route never touches
-    the real DB, and we can control the returned data.
-    """
+    """It returns a paginated list using a mocked MovieService."""
 
     class FakeMovieService:
         def __init__(self, _db: Any) -> None:

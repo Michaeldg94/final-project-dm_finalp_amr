@@ -42,7 +42,7 @@ logger = logging.getLogger(__name__)
 # ───────────────────────────── Dependencies ─────────────────────────────
 
 def get_db() -> Generator[Session, None, None]:
-    """Yield a SQLAlchemy :class:`Session` for request-scoped DB access."""
+    """FastAPI dependency that yields a SQLAlchemy `Session`."""
     with session_manager.open_session() as session:
         yield session
 

@@ -1,12 +1,4 @@
-"""Service-level tests for the recommendation helpers.
-
-These tests validate:
-- `_prune_to_trainable`: long-tail pruning and caps behavior.
-- `_build_user_item_sparse`: CSR construction, ordering, and values.
-- `recommend_for_user`: hot-start path (uses loaded model) and cold-start fallback.
-
-All tests avoid touching MLflow or a real DB by monkeypatching `_load_latest_model`.
-"""
+"""Service-level tests for the recommendation helpers."""
 
 from __future__ import annotations
 

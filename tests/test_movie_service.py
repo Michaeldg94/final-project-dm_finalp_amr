@@ -70,9 +70,6 @@ def test_get_movies_paginated_returns_schemas_and_total(
     service: MovieService,
 ) -> None:
     """MovieService.get_movies_paginated maps ORM models to MovieSchema and returns total."""
-    # MovieService expects DataManager.get_movies_paginated -> (models, total)
-    # It then maps models to MovieSchema via MovieSchema.model_validate(model)
-    # We'll return minimal "model-like" objects with a to_dict() that fits MovieSchema.
     fake_models = [
         SimpleNamespace(
             movie_id=10,
