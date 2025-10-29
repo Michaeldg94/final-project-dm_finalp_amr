@@ -8,6 +8,7 @@ and computing aggregate rating stats. Uses SQLAlchemy (sync).
 from typing import List, Optional, Tuple
 
 from sqlalchemy import select, func, or_, case
+from sqlalchemy.orm import selectinload
 from sqlalchemy.dialects import postgresql
 
 from server.models.movies import MovieModel
@@ -21,14 +22,6 @@ from server.services.base import BaseDataManager, BaseService
 # ======================================
 class MovieService(BaseService):
     """Application-facing operations for movies."""
-
-    def get_movie(self, movie_id: int) -> MovieSchema:
-        """Return a single movie mapped to a schema."""
-        return MovieDataManager(self.session).get_movie(movie_id)
-
-    def get_movies(self, year: int, rating: float) -> List[MovieSchema]:
-        """Return all movies filtered by release year and minimum rating."""
-        return MovieDataManager(self.session).get_movies(year, rating)
     
     def get_movies_paginated(
         self, page: int, limit: int, search: Optional[str] = None
@@ -91,70 +84,61 @@ class MovieDataManager(BaseDataManager):
         limit: int = 10,
         search: Optional[str] = None,
     ) -> Tuple[List[MovieModel], int]:
-        """Return a list of MovieModel instances and total count (with search)."""
+        """Return paginated movies matching title or genre, ordered by relevance."""
         offset = (page - 1) * limit
 
-        # Base query
-        stmt = select(MovieModel).join(MovieModel.genres, isouter=True)
-
-        # Apply search filter
-        if search:
-            search_lower = search.lower()
-            search_term = f"%{search_lower}%"
-
-            # WHERE filters (match title or genre)
-            stmt = stmt.where(
-                or_(
-                    func.lower(MovieModel.title).like(search_term),
-                    func.lower(GenreModel.genre_name).like(search_term),
-                )
+        if not search:
+            total = self.session.query(func.count(MovieModel.movie_id)).scalar()
+            movies = (
+                self.session.query(MovieModel)
+                .options(selectinload(MovieModel.genres))
+                .order_by(MovieModel.title.asc())
+                .offset(offset)
+                .limit(limit)
+                .all()
             )
+            return movies, total
 
-            # ORDER BY relevance (title exact > title partial > genre match)
-            stmt = stmt.order_by(
-                case((func.lower(MovieModel.title) == search_lower, 3), else_=0).desc(),
-                case((func.lower(MovieModel.title).like(search_term), 2), else_=0).desc(),
-                case((func.lower(GenreModel.genre_name).like(search_term), 1), else_=0).desc(),
-                MovieModel.title.asc(),
-            )
+        search_lower = search.lower()
+        search_term = f"%{search_lower}%"
 
-        else:
-            # Default ordering if no search term
-            stmt = stmt.order_by(MovieModel.title.asc())
+        # Subquery: find matching movie_ids + relevance
+        relevance_expr = (
+            case((func.lower(MovieModel.title) == search_lower, 3), else_=0)
+            + case((func.lower(MovieModel.title).like(search_term), 2), else_=0)
+            + case((func.lower(GenreModel.genre_name).like(search_term), 1), else_=0)
+        ).label("relevance")
 
-        print("\n=== DEBUG SQL ===")
-        print(
-            stmt.compile(
-                dialect=postgresql.dialect(),
-                compile_kwargs={"literal_binds": True}
-            ),
-            flush=True
-        )
-        print("=================\n")
-        # Count total
-        count_stmt = (
-            select(func.count(func.distinct(MovieModel.movie_id)))
-            .select_from(MovieModel)
+        subq = (
+            select(MovieModel.movie_id, relevance_expr)
             .join(MovieModel.genres, isouter=True)
-        )
-
-        if search:
-            count_stmt = count_stmt.where(
+            .where(
                 or_(
                     func.lower(MovieModel.title).like(search_term),
                     func.lower(GenreModel.genre_name).like(search_term),
                 )
             )
+            .distinct()
+            .subquery()
+        )
 
+        # Count how many unique movie_ids matched
+        count_stmt = select(func.count()).select_from(subq)
         total = self.session.execute(count_stmt).scalar() or 0
 
-        # Fetch paginated results
-        stmt = stmt.offset(offset).limit(limit)
+        # Outer query: join back on movie_id and order by relevance
+        query = (
+            self.session.query(MovieModel)
+            .join(subq, subq.c.movie_id == MovieModel.movie_id)
+            .options(selectinload(MovieModel.genres))
+            .order_by(subq.c.relevance.desc(), MovieModel.title.asc())
+            .offset(offset)
+            .limit(limit)
+        )
 
-        models = self.get_all(stmt)
-
-        return models, total
-   
+        movies = query.all()
+        return movies, total
+    
     def avg_rating(self, movie_id: int):
         """Return movie title, avg_rating, and total_ratings for a movie."""
         stmt = (
